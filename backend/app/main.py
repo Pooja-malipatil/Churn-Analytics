@@ -67,3 +67,5 @@ def root():
 @app.get("/health", tags=["Health"])
 def health_check():
     return {"status": "ok"}
+
+# uvicorn app.main:app --reload --port 8000
