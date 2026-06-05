@@ -33,20 +33,11 @@ uploaded_file_info = {
 
 class ColumnMapping(BaseModel):
     """
-    User tells us which column maps to what.
-    All fields optional — user only maps what exists.
+    User only tells us the churn column.
+    Everything else is auto-detected.
     """
-    churn_col:           str
-    churn_yes_value:     str
-    tenure_col:          Optional[str] = None
-    monthly_charges_col: Optional[str] = None
-    total_charges_col:   Optional[str] = None
-    contract_col:        Optional[str] = None
-    internet_col:        Optional[str] = None
-    payment_col:         Optional[str] = None
-    online_security_col: Optional[str] = None
-    tech_support_col:    Optional[str] = None
-
+    churn_col:       str
+    churn_yes_value: str
 
 @router.post("/upload/dataset")
 async def upload_dataset(file: UploadFile = File(...)):
@@ -232,85 +223,169 @@ async def get_dataset_info():
 
 def apply_column_mapping(df: pd.DataFrame, mapping: ColumnMapping) -> pd.DataFrame:
     """
-    Apply user's column mapping to create standardized dataframe.
+    User provides churn column.
+    Machine auto-detects everything else.
     """
-
     result = pd.DataFrame()
 
-    # CHURN column — required
+    # -----------------------------------------------
+    # CHURN — from user selection
+    # -----------------------------------------------
     result["churned"] = df[mapping.churn_col].apply(
         lambda x: 1 if str(x).strip() == str(mapping.churn_yes_value).strip()
         else 0
     )
 
+    # -----------------------------------------------
+    # AUTO DETECT ALL OTHER COLUMNS
+    # -----------------------------------------------
+    cols = list(df.columns)
+
+    def find_col(candidates):
+        """Find first matching column from candidates list."""
+        for c in candidates:
+            if c in cols:
+                return c
+        return None
+
+    def to_numeric_col(col_name, default=0):
+        if col_name and col_name in df.columns:
+            return pd.to_numeric(
+                df[col_name], errors="coerce"
+            ).fillna(default)
+        return default
+
+    def to_binary_col(col_name, default=0):
+        if col_name and col_name in df.columns:
+            return df[col_name].apply(
+                lambda x: 1 if str(x).lower() in
+                ["yes", "1", "true", "y"] else 0
+            )
+        return default
+
+    def to_string_col(col_name, default="Unknown"):
+        if col_name and col_name in df.columns:
+            return df[col_name].fillna(default).astype(str)
+        return default
+
     # TENURE
-    if mapping.tenure_col and mapping.tenure_col in df.columns:
-        result["tenure_months"] = pd.to_numeric(
-            df[mapping.tenure_col], errors="coerce"
-        ).fillna(0)
-    else:
-        result["tenure_months"] = 0
+    tenure_col = find_col([
+        "tenure", "Tenure", "tenure_months",
+        "months", "duration", "age_months",
+        "customer_age", "subscription_months"
+    ])
+    result["tenure_months"] = to_numeric_col(tenure_col, 0)
 
     # MONTHLY CHARGES
-    if mapping.monthly_charges_col and mapping.monthly_charges_col in df.columns:
-        result["monthly_charges"] = pd.to_numeric(
-            df[mapping.monthly_charges_col], errors="coerce"
-        ).fillna(0)
-    else:
-        result["monthly_charges"] = 0.0
+    monthly_col = find_col([
+        "MonthlyCharges", "monthly_charges", "monthly_charge",
+        "charges", "bill", "monthly_bill", "monthly_fee",
+        "subscription_fee", "price", "amount"
+    ])
+    result["monthly_charges"] = to_numeric_col(monthly_col, 0.0)
 
     # TOTAL CHARGES
-    if mapping.total_charges_col and mapping.total_charges_col in df.columns:
-        result["total_charges"] = pd.to_numeric(
-            df[mapping.total_charges_col], errors="coerce"
-        ).fillna(0)
-    else:
-        result["total_charges"] = result["monthly_charges"] * result["tenure_months"]
+    total_col = find_col([
+        "TotalCharges", "total_charges", "total_charge",
+        "total_bill", "lifetime_value", "total_spent",
+        "total_revenue", "ltv"
+    ])
+    result["total_charges"] = to_numeric_col(total_col, 0.0)
+
+    # If total charges is 0 but we have monthly and tenure
+    # calculate it automatically
+    zero_total = result["total_charges"] == 0
+    if zero_total.any():
+        result.loc[zero_total, "total_charges"] = (
+            result.loc[zero_total, "monthly_charges"] *
+            result.loc[zero_total, "tenure_months"]
+        )
 
     # CONTRACT TYPE
-    if mapping.contract_col and mapping.contract_col in df.columns:
-        result["contract_type"] = df[mapping.contract_col].fillna("Month-to-month")
-    else:
-        result["contract_type"] = "Month-to-month"
+    contract_col = find_col([
+        "Contract", "contract_type", "contract",
+        "plan", "subscription_type", "plan_type",
+        "billing_type", "billing_cycle"
+    ])
+    result["contract_type"] = to_string_col(
+        contract_col, "Month-to-month"
+    )
 
     # INTERNET SERVICE
-    if mapping.internet_col and mapping.internet_col in df.columns:
-        result["internet_service"] = df[mapping.internet_col].fillna("DSL")
-    else:
-        result["internet_service"] = "DSL"
+    internet_col = find_col([
+        "InternetService", "internet_service", "internet",
+        "service_type", "connection_type", "internet_type"
+    ])
+    result["internet_service"] = to_string_col(internet_col, "DSL")
 
     # PAYMENT METHOD
-    if mapping.payment_col and mapping.payment_col in df.columns:
-        result["payment_method"] = df[mapping.payment_col].fillna("Electronic check")
-    else:
-        result["payment_method"] = "Electronic check"
+    payment_col = find_col([
+        "PaymentMethod", "payment_method", "payment",
+        "billing_method", "payment_type"
+    ])
+    result["payment_method"] = to_string_col(
+        payment_col, "Electronic check"
+    )
 
     # ONLINE SECURITY
-    if mapping.online_security_col and mapping.online_security_col in df.columns:
-        result["online_security"] = df[mapping.online_security_col].apply(
-            lambda x: 1 if str(x).lower() in ["yes", "1", "true"] else 0
-        )
-    else:
-        result["online_security"] = 0
+    security_col = find_col([
+        "OnlineSecurity", "online_security",
+        "security", "online_sec"
+    ])
+    result["online_security"] = to_binary_col(security_col, 0)
 
     # TECH SUPPORT
-    if mapping.tech_support_col and mapping.tech_support_col in df.columns:
-        result["tech_support"] = df[mapping.tech_support_col].apply(
-            lambda x: 1 if str(x).lower() in ["yes", "1", "true"] else 0
-        )
-    else:
-        result["tech_support"] = 0
+    support_col = find_col([
+        "TechSupport", "tech_support",
+        "technical_support", "support"
+    ])
+    result["tech_support"] = to_binary_col(support_col, 0)
 
-    # Add remaining required columns with defaults
-    defaults = {
-        "streaming_tv":        0,
-        "streaming_movies":    0,
-        "phone_service":       1,
-        "multiple_lines":      0,
-        "num_support_tickets": 0,
-    }
-    for col, val in defaults.items():
-        result[col] = val
+    # STREAMING TV
+    tv_col = find_col([
+        "StreamingTV", "streaming_tv",
+        "tv", "television", "stream_tv"
+    ])
+    result["streaming_tv"] = to_binary_col(tv_col, 0)
+
+    # STREAMING MOVIES
+    movies_col = find_col([
+        "StreamingMovies", "streaming_movies",
+        "movies", "stream_movies", "vod"
+    ])
+    result["streaming_movies"] = to_binary_col(movies_col, 0)
+
+    # PHONE SERVICE
+    phone_col = find_col([
+        "PhoneService", "phone_service",
+        "phone", "telephone", "voice"
+    ])
+    result["phone_service"] = to_binary_col(phone_col, 1)
+
+    # MULTIPLE LINES
+    lines_col = find_col([
+        "MultipleLines", "multiple_lines",
+        "multi_lines", "lines"
+    ])
+    result["multiple_lines"] = to_binary_col(lines_col, 0)
+
+    # SUPPORT TICKETS
+    tickets_col = find_col([
+        "num_support_tickets", "support_tickets",
+        "tickets", "complaints", "num_complaints"
+    ])
+    result["num_support_tickets"] = to_numeric_col(tickets_col, 0)
+
+    # Log what was auto-detected
+    print(f"✅ Auto-detected columns:")
+    print(f"   tenure:          {tenure_col}")
+    print(f"   monthly_charges: {monthly_col}")
+    print(f"   total_charges:   {total_col}")
+    print(f"   contract:        {contract_col}")
+    print(f"   internet:        {internet_col}")
+    print(f"   payment:         {payment_col}")
+    print(f"   online_security: {security_col}")
+    print(f"   tech_support:    {support_col}")
 
     return result
 
