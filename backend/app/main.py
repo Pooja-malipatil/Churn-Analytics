@@ -11,8 +11,7 @@ from app.database import engine, Base
 from app.models import customer, prediction
 from app.models import user as user_model
 
-# Import all routers
-from app.routers import predict, analytics, retention, upload, customers, auth
+from app.routers import predict, analytics, retention, upload, customers, auth, reports
 
 # Create all DB tables
 Base.metadata.create_all(bind=engine)
@@ -44,6 +43,7 @@ app.include_router(retention.router,  prefix="/api/v1", tags=["Retention"])
 app.include_router(upload.router,     prefix="/api/v1", tags=["Data Upload"])
 app.include_router(customers.router,  prefix="/api/v1", tags=["Customers"])
 app.include_router(auth.router,       prefix="/api/v1", tags=["Authentication"])
+app.include_router(reports.router, prefix="/api/v1", tags=["Reports"])
 
 
 @app.on_event("startup")
