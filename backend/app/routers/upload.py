@@ -10,7 +10,11 @@ import os
 
 router = APIRouter()
 
-# Store training status in memory
+active_column_mapping = {
+    "churn_col":       None,
+    "churn_yes_value": None,
+    "dataset_path":    None,
+}
 training_status = {
     "is_training":       False,
     "progress":          0,
@@ -389,7 +393,12 @@ def apply_column_mapping(df: pd.DataFrame, mapping: ColumnMapping) -> pd.DataFra
 
     return result
 
-
+async def retrain_model(filepath, num_rows, mapping):
+    # Save mapping globally for analytics to use
+    active_column_mapping["churn_col"]       = mapping.churn_col
+    active_column_mapping["churn_yes_value"] = mapping.churn_yes_value
+    active_column_mapping["dataset_path"]    = filepath
+    # ... rest of function
 async def retrain_model(
     filepath: str,
     num_rows:  int,
