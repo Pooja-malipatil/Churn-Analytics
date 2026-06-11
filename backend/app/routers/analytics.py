@@ -15,6 +15,10 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 print(f"📁 Analytics data directory: {DATA_DIR}")
 
 
+# -----------------------------------------------
+# HELPER FUNCTIONS
+# -----------------------------------------------
+
 def get_column_mapping():
     """Get the active column mapping from upload router."""
     try:
@@ -27,173 +31,76 @@ def get_column_mapping():
 def detect_columns(df: pd.DataFrame) -> dict:
     """
     Automatically detect what each column represents.
-    Works for ANY dataset by analyzing column names and data types.
-    Returns a dict mapping our internal names to actual column names.
+    Works for ANY dataset.
     """
     cols       = list(df.columns)
     cols_lower = [c.lower() for c in cols]
     detected   = {}
 
     def find(keywords: list) -> str:
-        """Find first column matching any keyword."""
         for kw in keywords:
             for i, c in enumerate(cols_lower):
                 if kw in c:
                     return cols[i]
         return None
 
-    # CHURN — most important
-    detected["churn"] = find([
-        "churn", "exited", "exit", "attrition",
-        "left", "cancelled", "churned", "is_churn",
-        "target", "label"
-    ])
+    detected["churn"]           = find(["churn", "exited", "exit", "attrition", "left", "cancelled", "target", "label"])
+    detected["tenure"]          = find(["tenure", "months", "duration", "age_months", "subscription_months", "customer_age"])
+    detected["monthly_charges"] = find(["monthly", "monthlycharge", "monthly_fee", "monthly_bill", "subscription", "price", "fee", "rate", "premium", "salary", "income", "estimated", "revenue"])
+    detected["total_charges"]   = find(["total_charge", "totalcharge", "total_bill", "total_paid", "lifetime_value", "ltv", "total_spend", "balance", "account_balance"])
+    detected["contract_type"]   = find(["contract", "plan", "subscription_type", "billing_type", "billing_cycle", "tier", "membership", "package", "geography", "location", "region", "country"])
+    detected["internet_service"]= find(["internet", "service_type", "connection", "broadband", "network", "access_type"])
+    detected["payment_method"]  = find(["payment", "billing_method", "pay_method", "payment_type", "payment_channel"])
+    detected["support_tickets"] = find(["ticket", "complaint", "support", "num_complaint", "issues", "calls", "numofproducts", "num_products", "products"])
+    detected["age"]             = find(["age", "customer_age", "age_years"])
+    detected["gender"]          = find(["gender", "sex"])
+    detected["credit_score"]    = find(["credit", "score", "creditscore", "credit_score"])
+    detected["is_active"]       = find(["active", "isactive", "is_active", "engaged"])
 
-    # TENURE — how long customer has been with company
-    detected["tenure"] = find([
-        "tenure", "months", "duration", "age_months",
-        "subscription_months", "customer_age", "years"
-    ])
-
-    # MONTHLY CHARGES — what customer pays per month
-    detected["monthly_charges"] = find([
-        "monthly", "monthly_charge", "monthlycharge",
-        "monthly_fee", "monthly_bill", "subscription",
-        "price", "fee", "rate", "premium"
-    ])
-
-    # TOTAL CHARGES — total paid overall
-    detected["total_charges"] = find([
-        "total_charge", "totalcharge", "total_bill",
-        "total_paid", "lifetime_value", "ltv",
-        "total_spend", "cumulative"
-    ])
-
-    # SALARY/ESTIMATED INCOME — if no charges found
-    if not detected["monthly_charges"]:
-        detected["monthly_charges"] = find([
-            "salary", "income", "estimated",
-            "revenue", "amount", "value"
-        ])
-
-    # BALANCE — financial datasets
-    if not detected["total_charges"]:
-        detected["total_charges"] = find([
-            "balance", "account_balance",
-            "total_balance", "net_worth"
-        ])
-
-    # CONTRACT / PLAN TYPE
-    detected["contract_type"] = find([
-        "contract", "plan", "subscription_type",
-        "billing_type", "billing_cycle", "tier",
-        "membership", "package"
-    ])
-
-    # GEOGRAPHY / LOCATION — often in bank datasets
-    if not detected["contract_type"]:
-        detected["contract_type"] = find([
-            "geography", "location", "region",
-            "country", "state", "city", "zone"
-        ])
-
-    # INTERNET / SERVICE TYPE
-    detected["internet_service"] = find([
-        "internet", "service_type", "connection",
-        "broadband", "network", "access_type"
-    ])
-
-    # PAYMENT METHOD
-    detected["payment_method"] = find([
-        "payment", "billing_method", "pay_method",
-        "payment_type", "payment_channel"
-    ])
-
-    # SUPPORT TICKETS / COMPLAINTS
-    detected["support_tickets"] = find([
-        "ticket", "complaint", "support",
-        "num_complaint", "issues", "calls",
-        "numofproducts", "num_products", "products"
-    ])
-
-    # AGE
-    detected["age"] = find(["age", "customer_age", "age_years"])
-
-    # GENDER
-    detected["gender"] = find(["gender", "sex"])
-
-    # CREDIT SCORE
-    detected["credit_score"] = find([
-        "credit", "score", "creditscore", "credit_score"
-    ])
-
-    # ACTIVE MEMBER / ENGAGEMENT
-    detected["is_active"] = find([
-        "active", "isactive", "is_active",
-        "engaged", "engagement"
-    ])
-
-    print(f"🔍 Auto-detected columns: {detected}")
+    print(f"🔍 Detected columns: {detected}")
     return detected
 
 
 def standardize_df(df: pd.DataFrame, mapping=None) -> pd.DataFrame:
-    """
-    Standardize any dataframe to our internal format.
-    Uses user mapping first, then auto-detection.
-    """
+    """Standardize any dataframe to our internal format."""
     detected = detect_columns(df)
     result   = df.copy()
 
-    # -----------------------------------------------
     # CHURN COLUMN
-    # -----------------------------------------------
     if mapping and mapping.get("churn_col"):
-        # User explicitly told us the churn column
         churn_col       = mapping["churn_col"]
         churn_yes_value = mapping.get("churn_yes_value", "")
-
         if churn_col in result.columns:
             result["churned"] = result[churn_col].apply(
-                lambda x: 1 if str(x).strip() == str(churn_yes_value).strip()
-                else 0
+                lambda x: 1 if str(x).strip() == str(churn_yes_value).strip() else 0
             )
-            print(f"✅ Churn from user mapping: "
-                  f"'{churn_col}' = '{churn_yes_value}' "
-                  f"→ {result['churned'].sum()} churned")
+            print(f"✅ Churn from user mapping: '{churn_col}'='{churn_yes_value}' → {result['churned'].sum()} churned")
 
     elif "churned" not in result.columns and detected["churn"]:
-        # Auto-detect churn column
         col = detected["churn"]
         result["churned"] = pd.to_numeric(
             result[col].map({
                 "Yes": 1, "No": 0, "yes": 1, "no": 0,
                 "True": 1, "False": 0, True: 1, False: 0,
                 1: 1, 0: 0, "1": 1, "0": 0,
-                "Attrited Customer": 1,
-                "Existing Customer": 0,
+                "Attrited Customer": 1, "Existing Customer": 0,
             }),
             errors="coerce"
         ).fillna(0).astype(int)
-        print(f"✅ Churn auto-detected from '{col}': "
-              f"{result['churned'].sum()} churned")
+        print(f"✅ Churn auto-detected from '{col}': {result['churned'].sum()} churned")
 
-    # Fix churned type
     if "churned" in result.columns:
         result["churned"] = pd.to_numeric(
             result["churned"], errors="coerce"
         ).fillna(0).astype(int)
 
-    # -----------------------------------------------
     # NUMERIC COLUMNS
-    # -----------------------------------------------
     numeric_map = {
         "tenure_months":       detected["tenure"],
         "monthly_charges":     detected["monthly_charges"],
         "total_charges":       detected["total_charges"],
         "num_support_tickets": detected["support_tickets"],
     }
-
     for internal_name, source_col in numeric_map.items():
         if source_col and source_col in result.columns:
             result[internal_name] = pd.to_numeric(
@@ -202,15 +109,12 @@ def standardize_df(df: pd.DataFrame, mapping=None) -> pd.DataFrame:
         elif internal_name not in result.columns:
             result[internal_name] = 0
 
-    # -----------------------------------------------
     # CATEGORICAL COLUMNS
-    # -----------------------------------------------
     cat_map = {
         "contract_type":    detected["contract_type"],
         "internet_service": detected["internet_service"],
         "payment_method":   detected["payment_method"],
     }
-
     for internal_name, source_col in cat_map.items():
         if source_col and source_col in result.columns:
             result[internal_name] = result[source_col].fillna("Unknown").astype(str)
@@ -234,21 +138,17 @@ def get_active_dataset() -> pd.DataFrame:
             try:
                 df = pd.read_csv(path)
                 df = standardize_df(df, mapping)
-                print(f"✅ Dataset loaded: {len(df)} rows, "
-                      f"churned: {df['churned'].sum()}")
+                print(f"✅ Dataset loaded: {len(df)} rows, churned: {df['churned'].sum() if 'churned' in df.columns else 'N/A'}")
                 return df
             except Exception as e:
-                print(f"❌ Error: {e}")
+                print(f"❌ Error loading {path}: {e}")
                 continue
 
     raise Exception(f"No dataset found in {DATA_DIR}")
 
 
 def get_churn_breakdown(df: pd.DataFrame, col: str) -> list:
-    """
-    Generic function to get churn breakdown for any column.
-    Works for contract type, geography, gender, any categorical column.
-    """
+    """Generic churn breakdown for any column."""
     if col not in df.columns or "churned" not in df.columns:
         return []
 
@@ -274,14 +174,10 @@ def get_churn_breakdown(df: pd.DataFrame, col: str) -> list:
 
 
 def get_best_numeric_col(df: pd.DataFrame, preferred: str) -> str:
-    """
-    Returns preferred column if it exists and has meaningful data,
-    otherwise finds the best numeric column.
-    """
+    """Returns best numeric column for financial metrics."""
     if preferred in df.columns and df[preferred].sum() > 0:
         return preferred
 
-    # Find numeric columns with meaningful values
     skip = [
         "churned", "RowNumber", "rownumber", "id", "ID",
         "tenure_months", "num_support_tickets",
@@ -295,9 +191,36 @@ def get_best_numeric_col(df: pd.DataFrame, preferred: str) -> str:
         c for c in numeric_cols
         if c not in skip and df[c].sum() > 0 and df[c].mean() > 1
     ]
-
     return numeric_cols[0] if numeric_cols else None
 
+
+def get_best_categorical_col(df, preferred, skip_cols=None) -> str:
+    """Returns best categorical column."""
+    if skip_cols is None:
+        skip_cols = []
+
+    if preferred in df.columns and \
+       df[preferred].nunique() > 1 and \
+       df[preferred].iloc[0] != "Unknown":
+        return preferred
+
+    cat_cols = df.select_dtypes(include=["object"]).columns.tolist()
+    base_skip = [
+        "churned", "customerID", "customer_id",
+        "Surname", "surname", "name", "Name",
+    ]
+    cat_cols = [
+        c for c in cat_cols
+        if c not in base_skip + skip_cols
+        and df[c].nunique() <= 20
+        and df[c].nunique() > 1
+    ]
+    return cat_cols[0] if cat_cols else None
+
+
+# -----------------------------------------------
+# API ENDPOINTS
+# -----------------------------------------------
 
 @router.get("/analytics/summary")
 async def get_summary():
@@ -309,7 +232,6 @@ async def get_summary():
         retained   = total - churned
         churn_rate = round(churned / total * 100, 1) if total > 0 else 0
 
-        # Find best column for financial metrics
         charge_col = get_best_numeric_col(df, "monthly_charges")
 
         avg_monthly      = 0.0
@@ -348,41 +270,17 @@ async def get_summary():
 
 @router.get("/analytics/churn-by-contract")
 async def churn_by_contract():
-    """
-    Works for ANY categorical column.
-    Uses contract_type if available, otherwise
-    uses best available categorical column.
-    """
     try:
-        df = get_active_dataset()
-
-        # Try contract_type first, then any categorical column
-        col = None
-        if "contract_type" in df.columns and \
-           df["contract_type"].nunique() > 1 and \
-           df["contract_type"].iloc[0] != "Unknown":
-            col = "contract_type"
-        else:
-            # Find best categorical column
-            cat_cols = df.select_dtypes(include=["object"]).columns.tolist()
-            skip     = [
-                "churned", "customerID", "customer_id",
-                "Surname", "surname", "name", "Name",
-                "internet_service", "payment_method",
-            ]
-            cat_cols = [
-                c for c in cat_cols
-                if c not in skip and df[c].nunique() <= 20
-                and df[c].nunique() > 1
-            ]
-            col = cat_cols[0] if cat_cols else None
+        df  = get_active_dataset()
+        col = get_best_categorical_col(df, "contract_type")
 
         if not col:
             return {"data": [], "column_used": None}
 
-        data = get_churn_breakdown(df, col)
-        return {"data": data, "column_used": col}
-
+        return {
+            "data":        get_churn_breakdown(df, col),
+            "column_used": col
+        }
     except Exception as e:
         print(f"Contract error: {e}")
         return {"error": str(e), "data": []}
@@ -390,10 +288,8 @@ async def churn_by_contract():
 
 @router.get("/analytics/churn-by-tenure")
 async def churn_by_tenure():
-    """Works for any numeric tenure-like column."""
     try:
-        df = get_active_dataset()
-
+        df         = get_active_dataset()
         tenure_col = get_best_numeric_col(df, "tenure_months")
 
         if not tenure_col or "churned" not in df.columns:
@@ -405,28 +301,21 @@ async def churn_by_tenure():
 
         max_val = df[tenure_col].max()
 
-        # Create dynamic bins based on data range
         if max_val <= 12:
             bins   = [0, 3, 6, 9, 12]
             labels = ["0-3", "4-6", "7-9", "10-12"]
         elif max_val <= 72:
             bins   = [0, 12, 24, 36, 48, 60, float("inf")]
-            labels = [
-                "0-12 months", "13-24 months", "25-36 months",
-                "37-48 months", "49-60 months", "60+ months"
-            ]
+            labels = ["0-12 months", "13-24 months", "25-36 months",
+                      "37-48 months", "49-60 months", "60+ months"]
         else:
             step   = max_val / 6
             bins   = [i * step for i in range(7)]
             bins[-1] = float("inf")
-            labels = [
-                f"{int(i*step)}-{int((i+1)*step)}"
-                for i in range(6)
-            ]
+            labels = [f"{int(i*step)}-{int((i+1)*step)}" for i in range(6)]
 
         df["tenure_group"] = pd.cut(
-            df[tenure_col],
-            bins=bins, labels=labels, right=True
+            df[tenure_col], bins=bins, labels=labels, right=True
         )
 
         result = []
@@ -452,41 +341,19 @@ async def churn_by_tenure():
 
 @router.get("/analytics/churn-by-internet")
 async def churn_by_internet():
-    """
-    Works for any categorical column.
-    Uses internet_service if available,
-    otherwise uses next best categorical column.
-    """
     try:
-        df = get_active_dataset()
-
-        col = None
-        if "internet_service" in df.columns and \
-           df["internet_service"].nunique() > 1 and \
-           df["internet_service"].iloc[0] != "Unknown":
-            col = "internet_service"
-        else:
-            cat_cols = df.select_dtypes(include=["object"]).columns.tolist()
-            skip     = [
-                "churned", "customerID", "customer_id",
-                "Surname", "surname", "name", "Name",
-                "contract_type", "payment_method",
-            ]
-            cat_cols = [
-                c for c in cat_cols
-                if c not in skip and df[c].nunique() <= 20
-                and df[c].nunique() > 1
-            ]
-            col = cat_cols[1] if len(cat_cols) > 1 else (
-                cat_cols[0] if cat_cols else None
-            )
+        df  = get_active_dataset()
+        col = get_best_categorical_col(
+            df, "internet_service", ["contract_type"]
+        )
 
         if not col:
             return {"data": [], "column_used": None}
 
-        data = get_churn_breakdown(df, col)
-        return {"data": data, "column_used": col}
-
+        return {
+            "data":        get_churn_breakdown(df, col),
+            "column_used": col
+        }
     except Exception as e:
         print(f"Internet error: {e}")
         return {"error": str(e), "data": []}
@@ -494,41 +361,19 @@ async def churn_by_internet():
 
 @router.get("/analytics/churn-by-payment")
 async def churn_by_payment():
-    """
-    Works for any categorical column.
-    Uses payment_method if available,
-    otherwise uses next best categorical column.
-    """
     try:
-        df = get_active_dataset()
-
-        col = None
-        if "payment_method" in df.columns and \
-           df["payment_method"].nunique() > 1 and \
-           df["payment_method"].iloc[0] != "Unknown":
-            col = "payment_method"
-        else:
-            cat_cols = df.select_dtypes(include=["object"]).columns.tolist()
-            skip     = [
-                "churned", "customerID", "customer_id",
-                "Surname", "surname", "name", "Name",
-                "contract_type", "internet_service",
-            ]
-            cat_cols = [
-                c for c in cat_cols
-                if c not in skip and df[c].nunique() <= 20
-                and df[c].nunique() > 1
-            ]
-            col = cat_cols[2] if len(cat_cols) > 2 else (
-                cat_cols[0] if cat_cols else None
-            )
+        df  = get_active_dataset()
+        col = get_best_categorical_col(
+            df, "payment_method", ["contract_type", "internet_service"]
+        )
 
         if not col:
             return {"data": [], "column_used": None}
 
-        data = get_churn_breakdown(df, col)
-        return {"data": data, "column_used": col}
-
+        return {
+            "data":        get_churn_breakdown(df, col),
+            "column_used": col
+        }
     except Exception as e:
         print(f"Payment error: {e}")
         return {"error": str(e), "data": []}
@@ -536,7 +381,6 @@ async def churn_by_payment():
 
 @router.get("/analytics/churn-by-charges")
 async def churn_by_charges():
-    """Works for any numeric column representing charges/value."""
     try:
         df         = get_active_dataset()
         charge_col = get_best_numeric_col(df, "monthly_charges")
@@ -578,16 +422,10 @@ async def churn_by_charges():
 
 @router.get("/analytics/service-impact")
 async def service_impact():
-    """
-    Works for any binary columns.
-    Uses known service columns if available,
-    otherwise finds binary columns automatically.
-    """
     try:
         df = get_active_dataset()
 
-        # Known service columns
-        known = [
+        known_services = [
             ("online_security",  "Online Security"),
             ("tech_support",     "Tech Support"),
             ("streaming_tv",     "Streaming TV"),
@@ -595,33 +433,18 @@ async def service_impact():
             ("phone_service",    "Phone Service"),
         ]
 
-        # Find binary columns (0/1 or Yes/No)
-        binary_cols = []
-        for col in df.columns:
-            if col in ["churned", "RowNumber", "rownumber"]:
-                continue
-            unique_vals = df[col].dropna().unique()
-            if len(unique_vals) == 2:
-                vals = set(str(v).lower() for v in unique_vals)
-                if vals <= {"0", "1", "yes", "no",
-                            "true", "false", "1.0", "0.0"}:
-                    binary_cols.append(col)
-
         result = []
 
-        # First try known service columns
-        for col, label in known:
+        # Try known service columns first
+        for col, label in known_services:
             if col not in df.columns or "churned" not in df.columns:
                 continue
 
             df[col] = pd.to_numeric(
                 df[col].map({
-                    "Yes": 1, "No": 0,
-                    "yes": 1, "no": 0,
-                    "No internet service": 0,
-                    "No phone service": 0,
-                    True: 1, False: 0,
-                    1: 1, 0: 0,
+                    "Yes": 1, "No": 0, "yes": 1, "no": 0,
+                    "No internet service": 0, "No phone service": 0,
+                    True: 1, False: 0, 1: 1, 0: 0,
                 }),
                 errors="coerce"
             ).fillna(0)
@@ -634,36 +457,35 @@ async def service_impact():
 
             result.append({
                 "service":        label,
-                "withService":    round(
-                    with_svc["churned"].mean() * 100, 1
-                ),
-                "withoutService": round(
-                    without_svc["churned"].mean() * 100, 1
-                ),
+                "withService":    round(with_svc["churned"].mean() * 100, 1),
+                "withoutService": round(without_svc["churned"].mean() * 100, 1),
             })
 
-        # If no known columns found, use auto-detected binary columns
+        # If no known columns, auto-detect binary columns
         if not result:
-            for col in binary_cols[:5]:
-                df[col] = pd.to_numeric(
-                    df[col], errors="coerce"
-                ).fillna(0)
-
-                with_svc    = df[df[col] == 1]
-                without_svc = df[df[col] == 0]
-
-                if len(with_svc) == 0 or len(without_svc) == 0:
+            skip = ["churned", "RowNumber", "rownumber", "id", "ID"]
+            for col in df.columns:
+                if col in skip:
                     continue
-
-                result.append({
-                    "service": col.replace("_", " ").title(),
-                    "withService":    round(
-                        with_svc["churned"].mean() * 100, 1
-                    ),
-                    "withoutService": round(
-                        without_svc["churned"].mean() * 100, 1
-                    ),
-                })
+                unique_vals = df[col].dropna().unique()
+                if len(unique_vals) == 2:
+                    vals = set(str(v).lower() for v in unique_vals)
+                    if vals <= {"0", "1", "yes", "no",
+                                "true", "false", "1.0", "0.0"}:
+                        df[col] = pd.to_numeric(
+                            df[col], errors="coerce"
+                        ).fillna(0)
+                        with_svc    = df[df[col] == 1]
+                        without_svc = df[df[col] == 0]
+                        if len(with_svc) == 0 or len(without_svc) == 0:
+                            continue
+                        result.append({
+                            "service":        col.replace("_", " ").title(),
+                            "withService":    round(with_svc["churned"].mean() * 100, 1),
+                            "withoutService": round(without_svc["churned"].mean() * 100, 1),
+                        })
+                        if len(result) >= 5:
+                            break
 
         return {"data": result}
 
@@ -674,7 +496,6 @@ async def service_impact():
 
 @router.get("/analytics/at-risk-customers")
 async def get_at_risk_customers():
-    """Get top at-risk customers using ML model."""
     try:
         df = get_active_dataset()
 
@@ -683,20 +504,10 @@ async def get_at_risk_customers():
         if not ml_service.is_ready:
             return {"data": [], "error": "ML model not loaded"}
 
-        NUMERIC_FEATURES     = [
-            "tenure_months", "monthly_charges",
-            "total_charges", "num_support_tickets"
-        ]
-        CATEGORICAL_FEATURES = [
-            "contract_type", "internet_service", "payment_method"
-        ]
-        BINARY_FEATURES      = [
-            "online_security", "tech_support", "streaming_tv",
-            "streaming_movies", "phone_service", "multiple_lines"
-        ]
-        ALL_FEATURES = (
-            NUMERIC_FEATURES + CATEGORICAL_FEATURES + BINARY_FEATURES
-        )
+        NUMERIC_FEATURES     = ["tenure_months", "monthly_charges", "total_charges", "num_support_tickets"]
+        CATEGORICAL_FEATURES = ["contract_type", "internet_service", "payment_method"]
+        BINARY_FEATURES      = ["online_security", "tech_support", "streaming_tv", "streaming_movies", "phone_service", "multiple_lines"]
+        ALL_FEATURES         = NUMERIC_FEATURES + CATEGORICAL_FEATURES + BINARY_FEATURES
 
         # Add missing columns with defaults
         defaults = {
@@ -721,12 +532,9 @@ async def get_at_risk_customers():
             if col in df.columns:
                 df[col] = pd.to_numeric(
                     df[col].map({
-                        "Yes": 1, "No": 0,
-                        "yes": 1, "no": 0,
-                        "No internet service": 0,
-                        "No phone service": 0,
-                        True: 1, False: 0,
-                        1: 1, 0: 0,
+                        "Yes": 1, "No": 0, "yes": 1, "no": 0,
+                        "No internet service": 0, "No phone service": 0,
+                        True: 1, False: 0, 1: 1, 0: 0,
                     }),
                     errors="coerce"
                 ).fillna(0)
@@ -736,7 +544,6 @@ async def get_at_risk_customers():
         df            = df.copy()
         df["churn_probability"] = probabilities
 
-        # Get top 20 at-risk
         at_risk = df[df["churn_probability"] >= 0.5].copy()
         at_risk = at_risk.sort_values(
             "churn_probability", ascending=False
@@ -758,25 +565,16 @@ async def get_at_risk_customers():
                 "High"     if prob >= 0.50 else
                 "Medium"
             )
-
-            customer_id = (
-                str(row[id_col]) if id_col else f"CUST_{idx}"
-            )
-
-            # Find best display values
-            contract = str(row.get("contract_type", "Unknown"))
-            internet = str(row.get("internet_service", "Unknown"))
-            monthly  = round(float(row.get("monthly_charges", 0)), 2)
-            tenure   = int(row.get("tenure_months", 0))
+            customer_id = str(row[id_col]) if id_col else f"CUST_{idx}"
 
             result.append({
                 "id":               customer_id,
                 "churnProbability": round(prob, 3),
                 "riskCategory":     risk,
-                "tenure":           tenure,
-                "monthlyCharges":   monthly,
-                "contract":         contract,
-                "internetService":  internet,
+                "tenure":           int(row.get("tenure_months", 0)),
+                "monthlyCharges":   round(float(row.get("monthly_charges", 0)), 2),
+                "contract":         str(row.get("contract_type", "Unknown")),
+                "internetService":  str(row.get("internet_service", "Unknown")),
             })
 
         return {"data": result, "total": len(result)}
@@ -784,3 +582,156 @@ async def get_at_risk_customers():
     except Exception as e:
         print(f"At-risk error: {e}")
         return {"data": [], "error": str(e)}
+
+
+@router.get("/analytics/model-features")
+async def get_model_features():
+    """
+    Returns the exact features the model uses for prediction
+    mapped to the active dataset's actual column names.
+    """
+    try:
+        df       = get_active_dataset()
+        detected = detect_columns(df)
+
+        def get_unique_values(col):
+            if col and col in df.columns:
+                vals = df[col].dropna().unique().tolist()
+                return [str(v) for v in vals[:20]]
+            return []
+
+        def get_stats(col):
+            if col and col in df.columns:
+                numeric = pd.to_numeric(df[col], errors="coerce")
+                return {
+                    "min":  round(float(numeric.min()), 2),
+                    "max":  round(float(numeric.max()), 2),
+                    "mean": round(float(numeric.mean()), 2),
+                }
+            return {"min": 0, "max": 100, "mean": 0}
+
+        features = [
+            {
+                "model_name":  "tenure_months",
+                "label":       "Tenure",
+                "description": "How long the customer has been with you",
+                "type":        "numeric",
+                "dataset_col": detected.get("tenure") or "tenure_months",
+                "stats":       get_stats(detected.get("tenure")),
+                "required":    True,
+            },
+            {
+                "model_name":  "monthly_charges",
+                "label":       "Monthly Charges",
+                "description": "What the customer pays per month",
+                "type":        "numeric",
+                "dataset_col": detected.get("monthly_charges") or "monthly_charges",
+                "stats":       get_stats(detected.get("monthly_charges")),
+                "required":    True,
+            },
+            {
+                "model_name":  "total_charges",
+                "label":       "Total Charges",
+                "description": "Total amount paid by customer",
+                "type":        "numeric",
+                "dataset_col": detected.get("total_charges") or "total_charges",
+                "stats":       get_stats(detected.get("total_charges")),
+                "required":    True,
+            },
+            {
+                "model_name":  "num_support_tickets",
+                "label":       "Support Tickets",
+                "description": "Number of complaints or support requests",
+                "type":        "numeric",
+                "dataset_col": detected.get("support_tickets") or "num_support_tickets",
+                "stats":       get_stats(detected.get("support_tickets")),
+                "required":    False,
+            },
+            {
+                "model_name":  "contract_type",
+                "label":       "Contract / Plan Type",
+                "description": "Type of contract or subscription",
+                "type":        "categorical",
+                "dataset_col": detected.get("contract_type") or "contract_type",
+                "values":      get_unique_values(detected.get("contract_type")),
+                "required":    True,
+            },
+            {
+                "model_name":  "internet_service",
+                "label":       "Service Type",
+                "description": "Type of service the customer uses",
+                "type":        "categorical",
+                "dataset_col": detected.get("internet_service") or "internet_service",
+                "values":      get_unique_values(detected.get("internet_service")),
+                "required":    False,
+            },
+            {
+                "model_name":  "payment_method",
+                "label":       "Payment Method",
+                "description": "How the customer pays",
+                "type":        "categorical",
+                "dataset_col": detected.get("payment_method") or "payment_method",
+                "values":      get_unique_values(detected.get("payment_method")),
+                "required":    False,
+            },
+            {
+                "model_name":  "online_security",
+                "label":       "Has Security / Protection",
+                "description": "Customer has security service",
+                "type":        "binary",
+                "dataset_col": "online_security",
+                "required":    False,
+            },
+            {
+                "model_name":  "tech_support",
+                "label":       "Has Tech Support",
+                "description": "Customer has support service",
+                "type":        "binary",
+                "dataset_col": "tech_support",
+                "required":    False,
+            },
+            {
+                "model_name":  "streaming_tv",
+                "label":       "Has Streaming TV",
+                "description": "Customer uses streaming TV",
+                "type":        "binary",
+                "dataset_col": "streaming_tv",
+                "required":    False,
+            },
+            {
+                "model_name":  "streaming_movies",
+                "label":       "Has Streaming Movies",
+                "description": "Customer uses streaming movies",
+                "type":        "binary",
+                "dataset_col": "streaming_movies",
+                "required":    False,
+            },
+            {
+                "model_name":  "phone_service",
+                "label":       "Has Phone Service",
+                "description": "Customer has phone service",
+                "type":        "binary",
+                "dataset_col": "phone_service",
+                "required":    False,
+            },
+            {
+                "model_name":  "multiple_lines",
+                "label":       "Has Multiple Lines",
+                "description": "Customer has multiple lines",
+                "type":        "binary",
+                "dataset_col": "multiple_lines",
+                "required":    False,
+            },
+        ]
+
+        return {
+            "features":   features,
+            "total_rows": len(df),
+            "churn_rate": round(
+                df["churned"].mean() * 100, 1
+            ) if "churned" in df.columns else 0,
+        }
+
+    except Exception as e:
+        print(f"Model features error: {e}")
+        return {"error": str(e), "features": []}
