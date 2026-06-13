@@ -184,30 +184,37 @@ class MLService:
         strategies = get_retention_strategies(churn_probability, input_data)
 
         return {
-            "customer_id":          request.customer_id,
-            "churn_probability":    round(churn_probability, 4),
-            "risk_category":        risk,
-            "top_risk_factors":     top_risk_factors,
-            "explanation":          explanation,
-            "retention_strategies": strategies,
-            "model_version":        "v1.0",
-            "prediction_id":        0,
-        }
+    "customer_id":          request.customer_id,
+    "churn_probability":    round(churn_probability, 4),
+    "risk_category":        risk,
+    "top_risk_factors":     top_risk_factors,
+    "explanation":          explanation,
+    "retention_strategies": strategies,
+    "model_version":        "v1.0",
+    "prediction_id":        -1,
+}
 
-    async def log_prediction(self, customer_id, result, db):
-        try:
-            from app.models.prediction import PredictionLog
-            log = PredictionLog(
-                customer_id         = customer_id,
-                churn_probability   = result["churn_probability"],
-                risk_category       = result["risk_category"],
-                feature_importances = result["top_risk_factors"],
-                shap_values         = result["top_risk_factors"],
-            )
-            db.add(log)
-            db.commit()
-        except Exception as e:
-            print(f"Logging error: {e}")
+async def log_prediction(self, customer_id, result, db):
+    """Log prediction to database."""
+    try:
+        from app.models.prediction import PredictionLog
+        log = PredictionLog(
+            customer_id         = customer_id,
+            churn_probability   = result["churn_probability"],
+            risk_category       = result["risk_category"],
+            model_version       = result.get("model_version", "v1.0"),
+            feature_importances = result.get("top_risk_factors", []),
+            shap_values         = result.get("top_risk_factors", []),
+            input_features      = {},
+        )
+        db.add(log)
+        db.commit()
+        db.refresh(log)
+        print(f"✅ Prediction logged for {customer_id}")
+        return log.id
+    except Exception as e:
+        print(f"Logging error: {e}")
+        return 0
 
     def _get_feature_names(self) -> list:
         try:

@@ -10,6 +10,7 @@ import RetentionCenter from "./pages/RetentionCenter"
 import UploadDataset from "./pages/UploadDataset"
 import Login from "./pages/Login"
 import Register from "./pages/Register"
+import Customers from "./pages/Customer"
 
 export default function App() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
             <Route path="analytics" element={<Analytics />} />
             <Route path="retention" element={<RetentionCenter />} />
             <Route path="upload"    element={<UploadDataset />} />
+            <Route path="customers" element={<Customers />} />
           </Route>
         </Routes>
       </DataProvider>

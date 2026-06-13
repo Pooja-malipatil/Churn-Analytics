@@ -1,10 +1,10 @@
+import { useState } from "react"
 import { Outlet, NavLink } from "react-router-dom"
 import {
-  LayoutDashboard, Brain,
-  BarChart3, Heart,
-  TrendingDown, Menu, X,Upload
+  LayoutDashboard, Brain, BarChart3,
+  Heart, TrendingDown, Menu, X,
+  Upload, Users
 } from "lucide-react"
-import { useState } from "react"
 import { useAuth } from "../../context/AuthContext"
 
 const NAV_ITEMS = [
@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { path: "/predict",   label: "Predict Churn",    icon: Brain           },
   { path: "/analytics", label: "Analytics",        icon: BarChart3       },
   { path: "/retention", label: "Retention Center", icon: Heart           },
+  { path: "/customers", label: "Customers",        icon: Users           },
   { path: "/upload",    label: "Upload Dataset",   icon: Upload          },
 ]
 

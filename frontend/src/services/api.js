@@ -106,4 +106,22 @@ export const downloadCustomerReport = async (predictionData) => {
   a.download = `ChurnAI_Customer_${predictionData.customer_id}.pdf`
   a.click()
   window.URL.revokeObjectURL(url)
+
 }
+
+// Customer prediction history
+export const getAllPredictions = (page = 1, limit = 10, risk = null, search = null) => {
+  let url = `/customers/predictions?page=${page}&limit=${limit}`
+  if (risk && risk !== "All") url += `&risk=${risk}`
+  if (search) url += `&search=${search}`
+  return API.get(url)
+}
+
+export const getCustomerPredictions = (customerId) =>
+  API.get(`/customers/predictions/${customerId}`)
+
+export const getPredictionStats = () =>
+  API.get("/customers/stats")
+
+export const deletePrediction = (id) =>
+  API.delete(`/customers/predictions/${id}`)
