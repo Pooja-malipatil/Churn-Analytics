@@ -45,13 +45,17 @@ export default function Customers() {
   const [customerDetail,setCustomerDetail] = useState(null)
   const limit = 10
 
+   useEffect(() => {
+    fetchData()
+    fetchStats()
+  }, [])
+  
+  
   useEffect(() => {
     fetchData()
   }, [page, riskFilter])
 
-  useEffect(() => {
-    fetchStats()
-  }, [])
+ 
 
   const fetchData = async () => {
     setLoading(true)
