@@ -9,10 +9,12 @@ class Settings(BaseSettings):
     APP_VERSION:     str  = "1.0.0"
     DEBUG:           bool = False
     ALLOWED_ORIGINS: List[str] = [
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "https://your-vercel-app.vercel.app",
-    ]
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://churn-analytics-wo2v-oue4lvob0-pmalipatil239-2834s-projects.vercel.app",
+    "https://churn-analytics-wo2v.vercel.app",
+    "https://*.vercel.app",
+]
     MODEL_PATH:      str = "models_saved/"
     RANDOM_STATE:    int = 42
 

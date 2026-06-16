@@ -29,12 +29,17 @@ app = FastAPI(
 # Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "https://churn-analytics-wo2v-oue4lvob0-pmalipatil239-2834s-projects.vercel.app",
+        "https://churn-analytics-wo2v.vercel.app",
+        "https://*.vercel.app",
+    ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
-app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Routers
 app.include_router(predict.router,    prefix="/api/v1", tags=["Prediction"])
