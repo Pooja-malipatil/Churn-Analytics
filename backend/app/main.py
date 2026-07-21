@@ -33,18 +33,7 @@ app.add_middleware(
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "https://churn-analytics-wo2v-oue4lvob0-pmalipatil239-2834s-projects.vercel.app",
-        "https://churn-analytics-wo2v.vercel.app",
-        "https://*.vercel.app",
-    ],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
 )
-
 # Routers
 app.include_router(predict.router,    prefix="/api/v1", tags=["Prediction"])
 app.include_router(analytics.router,  prefix="/api/v1", tags=["Analytics"])
