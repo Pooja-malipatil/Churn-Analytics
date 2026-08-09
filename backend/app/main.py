@@ -27,6 +27,8 @@ app = FastAPI(
 )
 
 # Middleware
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -34,14 +36,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 # Routers
-app.include_router(predict.router,    prefix="/api/v1", tags=["Prediction"])
-app.include_router(analytics.router,  prefix="/api/v1", tags=["Analytics"])
-app.include_router(retention.router,  prefix="/api/v1", tags=["Retention"])
-app.include_router(upload.router,     prefix="/api/v1", tags=["Data Upload"])
-app.include_router(customers.router,  prefix="/api/v1", tags=["Customers"])
-app.include_router(auth.router,       prefix="/api/v1", tags=["Authentication"])
-app.include_router(reports.router, prefix="/api/v1", tags=["Reports"])
+app.include_router(predict.router,   prefix="/api/v1", tags=["Prediction"])
+app.include_router(analytics.router, prefix="/api/v1", tags=["Analytics"])
+app.include_router(retention.router, prefix="/api/v1", tags=["Retention"])
+app.include_router(upload.router,    prefix="/api/v1", tags=["Data Upload"])
+app.include_router(customers.router, prefix="/api/v1", tags=["Customers"])
+app.include_router(auth.router,      prefix="/api/v1", tags=["Authentication"])
+app.include_router(reports.router,   prefix="/api/v1", tags=["Reports"])
 
 
 @app.on_event("startup")
@@ -65,5 +68,3 @@ def root():
 @app.get("/health", tags=["Health"])
 def health_check():
     return {"status": "ok"}
-
-# uvicorn app.main:app --reload --port 8000c
